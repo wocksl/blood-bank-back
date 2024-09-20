@@ -42,16 +42,44 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build, tag, and push image to Amazon ECR
+    # - name: Build, tag, and push image to Amazon ECR
+    #   id: build-image
+    #   env:
+    #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+    #     IMAGE_TAG: ${{ github.sha }}
+    #   run: |
+    #     # Build a docker container and
+    #     # push it to ECR so that it can
+    #     # be deployed to ECS.
+    #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+    #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+    #     echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    # 이미지 빌드 과정 
+    - name: Build image
       id: build-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
+        IMAGE_TAG: ${{ github.sha }}-$(date +%Y%m%d-%H%M%S)
       run: |
-        # Build a docker container and
-        # push it to ECR so that it can
-        # be deployed to ECS.
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+    
+    # Dockle 보안 스캔
+    - name: Run Dockle security scan
+      continue-on-error: true # Dockle 스캔 중 오류가 나도 파이프라인 계속 진행, 끝에 || exit 1 추가하면 파이프라인 종료
+      run: |
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # Trivy 취약점 스캔
+    - name: Run Trivy vulnerability scan
+      continue-on-error: true  # Trivy 스캔 중 오류가 나도 파이프라인 계속 진행, 끝에 || exit 1 추가하면 파이프라인 종료
+      run: |
+        docker run --rm aquasec/trivy image --exit-code 1 --severity HIGH,CRITICAL $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # 이미지 태그 생성
+    - name: Push image to Amazon ECR
+      # if: success()
+      run: |
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
