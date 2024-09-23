@@ -65,8 +65,8 @@ jobs:
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
     
     # 의존성 스냅샷을 위한 github-pat 사용
-    - name: Upload Dependency Snapshot
-      uses: github/dependency-snapshot-action@v1
+    - name: Upload Dependency review
+      uses: github/dependency-review-action@v1
       with:
         token: ${{ secrets.TRIVY_GITHUB_PAT }}  # Personal Access Token (PAT)
 
