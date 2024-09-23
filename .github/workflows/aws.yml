@@ -79,10 +79,10 @@ jobs:
     
     # 취약점 github에 게시
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
-        sarif_file: 'trivy-results.sarif'
-        
+        sarif_file: trivy-results.sarif
+
     # 이미지 태그 생성 및 ECR에 image push
     - name: Push image to Amazon ECR
       id: push-image
