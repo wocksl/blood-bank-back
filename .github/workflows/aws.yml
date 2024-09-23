@@ -50,23 +50,13 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-        echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
-        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-
-    # 환경변수 확인
-    - name: Check environment variables
-      run: |
-        echo "ECR_REGISTRY=${{ env.ECR_REGISTRY }}"
-        echo "ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}"
-        echo "IMAGE_TAG=${{ env.IMAGE_TAG }}"
 
     # Dockle 보안 스캔
     - name: Run Dockle security scan
       uses: goodwithtech/dockle-action@main
       continue-on-error: true  # 보안 검사 실패 시도 계속 진행
       with:
-        image: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+        image: '${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
         format: 'list'
         exit-code: '1'
         exit-level: 'warn'
@@ -78,7 +68,7 @@ jobs:
       uses: aquasecurity/trivy-action@0.20.0
       continue-on-error: true  # 보안 검사 실패 시도 계속 진행
       with:
-        image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+        image-ref: '${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
