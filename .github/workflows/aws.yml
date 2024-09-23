@@ -50,18 +50,23 @@ jobs:
       run: |
         docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
+    # # Dockle 보안 스캔
+    # - name: Run Dockle security scan
+    #   uses: goodwithtech/dockle-action@main
+    #   continue-on-error: true  # 보안 검사 실패 시도 계속 진행
+    #   with:
+    #     image: '${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+    #     format: 'list'
+    #     exit-code: '1'
+    #     exit-level: 'warn'
+    #     ignore: 'CIS-DI-0001,DKL-DI-0006'
+    
     # Dockle 보안 스캔
     - name: Run Dockle security scan
-      uses: goodwithtech/dockle-action@main
-      continue-on-error: true  # 보안 검사 실패 시도 계속 진행
-      with:
-        image: '${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
-        format: 'list'
-        exit-code: '1'
-        exit-level: 'warn'
-        ignore: 'CIS-DI-0001,DKL-DI-0006'
-
-    
+      continue-on-error: true # Dockle 스캔 중 오류가 나도 파이프라인 계속 진행, 끝에 || exit 1 추가하면 파이프라인 종료
+      run: |
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
+      
     # Trivy 취약점 스캔
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@0.20.0
@@ -76,6 +81,7 @@ jobs:
 
     # 이미지 태그 생성 및 ECR에 image push
     - name: Push image to Amazon ECR
+      id: push-image
       if: success()
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -99,7 +105,7 @@ jobs:
       with:
         task-definition: ${{ steps.retrieve-task-def.outputs.task-def-file }}
         container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.build-image.outputs.image }}
+        image: ${{ steps.push-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
