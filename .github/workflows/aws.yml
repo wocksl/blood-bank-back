@@ -18,7 +18,7 @@ env:
 
 permissions:
   contents: read
-  # security-events: write  # SARIF 파일 업로드 권한
+  security-events: write  # SARIF 파일 업로드 권한
 
 jobs:
   deploy:
@@ -64,11 +64,11 @@ jobs:
       run: |
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
     
-    # 의존성 스냅샷을 위한 github-pat 사용
-    - name: Upload Dependency review
-      uses: github/dependency-review-action@v1
-      with:
-        token: ${{ secrets.TRIVY_GITHUB_PAT }}  # Personal Access Token (PAT)
+    # # 의존성 스냅샷을 위한 github-pat 사용
+    # - name: Upload Dependency review
+    #   uses: github/dependency-review-action@v1
+    #   with:
+    #     token: ${{ secrets.TRIVY_GITHUB_PAT }}  # Personal Access Token (PAT)
 
     # Trivy 취약점 스캔
     - name: Run Trivy vulnerability scanner
@@ -77,19 +77,19 @@ jobs:
       with:
         image-ref: '${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
         # format: 'table'
-        # format: 'sarif'
-        format: 'github'
-        # output: 'trivy-results.sarif'
+        format: 'sarif'
+        # format: 'github'
+        output: 'trivy-results.sarif'
         exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
 
-    # # 취약점 github에 게시
-    # - name: Upload Trivy scan results to GitHub Security tab
-    #   uses: github/codeql-action/upload-sarif@v3
-    #   with:
-    #     sarif_file: trivy-results.sarif
+    # 취약점 github에 게시
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-results.sarif
 
     # 이미지 태그 생성 및 ECR에 image push
     - name: Push image to Amazon ECR
