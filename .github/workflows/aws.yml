@@ -57,7 +57,9 @@ jobs:
 
     # Dockle 보안 스캔
     - name: Run Dockle security scan
-      continue-on-error: true
+      # continue-on-error: true
+      env:
+        IMAGE_TAG: ${{ github.sha }}
       run: |
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
       
