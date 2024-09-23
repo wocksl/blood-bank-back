@@ -19,7 +19,7 @@ env:
 permissions:
   contents: read
   security-events: write  # SARIF 파일 업로드 권한
-  
+
 jobs:
   deploy:
     name: Deploy
@@ -71,18 +71,19 @@ jobs:
       with:
         image-ref: '${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
         # format: 'table'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+        # format: 'sarif'
+        format: 'github'
+        # output: 'trivy-results.sarif'
         exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
     
-    # 취약점 github에 게시
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: trivy-results.sarif
+    # # 취약점 github에 게시
+    # - name: Upload Trivy scan results to GitHub Security tab
+    #   uses: github/codeql-action/upload-sarif@v3
+    #   with:
+    #     sarif_file: trivy-results.sarif
 
     # 이미지 태그 생성 및 ECR에 image push
     - name: Push image to Amazon ECR
