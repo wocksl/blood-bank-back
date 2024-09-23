@@ -50,25 +50,25 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
     
     # Dockle 보안 스캔
     - name: Run Dockle security scan
       continue-on-error: true
       run: |
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
 
     # Trivy 취약점 스캔
     - name: Run Trivy vulnerability scan
       continue-on-error: true
       run: |
-        docker run --rm aquasec/trivy image --exit-code 1 --severity HIGH,CRITICAL $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker run --rm aquasec/trivy image --exit-code 1 --severity HIGH,CRITICAL ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
 
     # 이미지 태그 생성
     - name: Push image to Amazon ECR
       # if: success()
       run: |
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
 
     # 가장 최신의 ECS 작업 정의 JSON 파일 검색
     - name: Retrieve most recent ECS task definition JSON file
