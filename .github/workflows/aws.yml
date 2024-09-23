@@ -18,7 +18,8 @@ env:
 
 permissions:
   contents: read
-
+  security-events: write  # SARIF 파일 업로드 권한
+  
 jobs:
   deploy:
     name: Deploy
