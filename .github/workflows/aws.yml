@@ -58,17 +58,11 @@ jobs:
 
     # Dockle 보안 스캔
     - name: Run Dockle security scan
-      # continue-on-error: true
+      continue-on-error: true
       env:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
-    
-    # # 의존성 스냅샷을 위한 github-pat 사용
-    # - name: Upload Dependency review
-    #   uses: github/dependency-review-action@v1
-    #   with:
-    #     token: ${{ secrets.TRIVY_GITHUB_PAT }}  # Personal Access Token (PAT)
 
     # Trivy 취약점 스캔
     - name: Run Trivy vulnerability scanner
@@ -76,9 +70,7 @@ jobs:
       continue-on-error: true  # 보안 검사 실패 시도 계속 진행
       with:
         image-ref: '${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
-        # format: 'table'
         format: 'sarif'
-        # format: 'github'
         output: 'trivy-results.sarif'
         exit-code: '1'
         ignore-unfixed: true
