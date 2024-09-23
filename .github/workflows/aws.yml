@@ -54,15 +54,25 @@ jobs:
     
     # Dockle 보안 스캔
     - name: Run Dockle security scan
-      continue-on-error: true
-      run: |
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REGISTRY}/$ECR_REPOSITORY:$IMAGE_TAG
+      uses: goodwithtech/dockle-action@main
+      with:
+        image: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+        format: 'list'
+        exit-code: '1'
+        exit-level: 'warn'
+        ignore: 'CIS-DI-0001,DKL-DI-0006'
 
+    
     # Trivy 취약점 스캔
-    - name: Run Trivy vulnerability scan
-      continue-on-error: true
-      run: |
-        docker run --rm aquasec/trivy image --exit-code 1 --severity HIGH,CRITICAL ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@0.20.0
+      with:
+        image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
 
     # 이미지 태그 생성
     - name: Push image to Amazon ECR
