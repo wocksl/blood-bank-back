@@ -53,7 +53,7 @@ jobs:
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
         echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
         echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-        
+
     # 환경변수 확인
     - name: Check environment variables
       run: |
@@ -65,7 +65,7 @@ jobs:
     - name: Run Dockle security scan
       uses: goodwithtech/dockle-action@main
       with:
-        image: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+        image: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}'
         format: 'list'
         exit-code: '1'
         exit-level: 'warn'
@@ -76,16 +76,16 @@ jobs:
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@0.20.0
       with:
-        image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+        image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
 
-    # 이미지 태그 생성
+    # 이미지 태그 생성 및 ECR에 image push
     - name: Push image to Amazon ECR
-      # if: success()
+      if: success()
       run: |
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
