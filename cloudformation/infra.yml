@@ -670,7 +670,7 @@ Resources:
       Matcher:
         HttpCode: 200-499
 
-  frontendALBTargetGroup:
+  FrontendALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: frontend-tg
@@ -713,6 +713,27 @@ Resources:
         - !Ref SubnetPublicIngress1A
         - !Ref SubnetPublicIngress1C
   
+  # 리스너 생성
+  BackendALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendALBTargetGroup
+      LoadBalancerArn: !Ref BackendALB
+      Port: 3001
+      Protocol: HTTP
+
+  FrontendALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendALBTargetGroup
+      LoadBalancerArn: !Ref FrontendALB
+      Port: 3000
+      Protocol: HTTP
+
   ### ECR Repo 생성
   BackendECRRepository:
     Type: AWS::ECR::Repository

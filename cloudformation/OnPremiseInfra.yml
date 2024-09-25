@@ -1,7 +1,7 @@
 Parameters:
-  # VPCId:
-  #   Description: "The VPC ID to use for the subnet or resources"
-  #   Type: String
+  VPCId:
+    Description: "The VPC ID to use for the subnet or resources"
+    Type: String
 
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instances. Linked to AWS Parameter
@@ -29,7 +29,7 @@ Resources:
         - 203.248.240.140, 168.126.3.6
       Tags:
         - Key: Name
-          Value: IDC-VPC2-DHCPOptions
+          Value: IDC-VPC-DHCPOptions
 
   VPC1DNSOptionsAssociation:                 
     Type: AWS::EC2::VPCDHCPOptionsAssociation
@@ -50,6 +50,7 @@ Resources:
       InternetGatewayId: !Ref IGW1
       VpcId: !Ref VPC1
 
+###############################################################################################
   PublicSN:
     Type: AWS::EC2::Subnet
     Properties:
@@ -60,6 +61,16 @@ Resources:
         - Key: Name
           Value: IDC-Public-SN
 
+  PrivateSN:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      AvailabilityZone: ap-northeast-2c #!Select [1, !GetAZs '' ]
+      CidrBlock: 20.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: IDC-Private-SN
+
   PublicRT:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -68,7 +79,15 @@ Resources:
         - Key: Name
           Value: IDC-Public-RT
 
-  DefaultPublicRoute:
+  PrivateRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC1
+      Tags:
+        - Key: Name
+          Value: IDC-Private-RT
+
+  PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: IGWAttachment
     Properties:
@@ -76,13 +95,28 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref IGW1  
 
+  PrivateRoute:        
+    Type: AWS::EC2::Route
+    DependsOn: DB
+    Properties:
+      RouteTableId: !Ref PrivateRT
+      DestinationCidrBlock: 10.0.0.0/16
+      NetworkInterfaceId: !Ref CGWENIEth0
+
   PublicSNRouteTableAssociation:         
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties: 
       RouteTableId: !Ref PublicRT
       SubnetId: !Ref PublicSN
 
-  ENIEth0:
+  PrivateSNRouteTableAssociation:         
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRT
+      SubnetId: !Ref PrivateSN
+#######################################################################################
+
+  CGWENIEth0:
     Type: AWS::EC2::NetworkInterface
     Properties:
       SubnetId: !Ref PublicSN
@@ -94,17 +128,17 @@ Resources:
         - Key: Name
           Value: CGW-ENI
 
-  VPCEIP:
+  CGWEIP:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
-  VPCAssociateEIP:
+  CGWVPCAssociateEIP:
     Type: AWS::EC2::EIPAssociation
-    DependsOn: IDCCGW
+    DependsOn: CGW
     Properties:
-      AllocationId: !GetAtt VPCEIP.AllocationId
-      NetworkInterfaceId: !Ref ENIEth0
+      AllocationId: !GetAtt CGWEIP.AllocationId
+      NetworkInterfaceId: !Ref CGWENIEth0
 
   DNSENIEth0:
     Type: AWS::EC2::NetworkInterface
@@ -130,7 +164,7 @@ Resources:
       AllocationId: !GetAtt DNSEIP.AllocationId
       NetworkInterfaceId: !Ref DNSENIEth0
 
-  IDCCGW:
+  CGW:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
@@ -138,11 +172,11 @@ Resources:
       KeyName: !Ref KeyName
       SourceDestCheck: False
       NetworkInterfaces:
-        - NetworkInterfaceId: !Ref ENIEth0
+        - NetworkInterfaceId: !Ref CGWENIEth0
           DeviceIndex: 0               
       Tags:
         - Key: Name
-          Value: IDCCGW
+          Value: CGW
       UserData:
         Fn::Base64: |
           #!/bin/bash
@@ -165,10 +199,106 @@ Resources:
           curl -o /etc/ipsec.d/vpnconfig.sh https://cloudneta-book.s3.ap-northeast-2.amazonaws.com/chapter6/6_lab_s2s-vpnconfig.sh
           chmod +x /etc/ipsec.d/vpnconfig.sh
 
+
+  DNS:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-06087749a704b8168
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - NetworkInterfaceId: !Ref DNSENIEth0
+          DeviceIndex: 0           
+      Tags:
+        - Key: Name
+          Value: IDC-DNSSRV
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          hostnamectl --static set-hostname DNSSRV
+          amazon-linux-extras install epel -y
+          yum -y install bind bind-utils bind-libs
+          sed -i "s/listen-on port 53 { 127.0.0.1; }/listen-on port 53 { any; }/g" /etc/named.conf
+          sed -i "s/allow-query     { localhost; }/allow-query     { any; }/g" /etc/named.conf
+          sed -i "s/dnssec-enable yes/dnssec-enable no/g" /etc/named.conf		  
+          sed -i "s/dnssec-validation yes/dnssec-validation no/g" /etc/named.conf
+          cat <<EOF>> /etc/named.rfc1912.zones	
+          zone "idcseoul.internal" {
+              type master;
+              file "/var/named/db.idcseoul.internal";
+              allow-update { none; };
+          };		  
+
+          EOF
+          cat <<EOF> /var/named/db.idcseoul.internal
+          \$TTL 300
+          @ IN SOA idcseoul.internal. root.idcseoul.internal. (
+            2019122114 ; serial
+            3600       ; refresh
+            900        ; retry
+            604800     ; expire
+            86400      ; minimum
+          )
+          @         IN NS ns1.idcseoul.internal.
+          ns1      IN A  20.0.0.200
+          dbsrv   IN A  20.0.1.100
+          dnssrv   IN A  20.0.0.200
+          
+          EOF
+          systemctl enable --now named                          
+
+
+  DB:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-06087749a704b8168  
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref PrivateSN
+          GroupSet:
+          - !Ref DBSG
+          AssociatePublicIpAddress: False
+          PrivateIpAddress: 20.0.1.100          
+      Tags:
+        - Key: Name
+          Value: IDC-DB
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            (
+            echo "qwe123"
+            echo "qwe123"
+            ) | passwd --stdin root
+            sed -i "s/^PasswordAuthentication no/PasswordAuthentication yes/g" /etc/ssh/sshd_config
+            sed -i "s/^#PermitRootLogin yes/PermitRootLogin yes/g" /etc/ssh/sshd_config
+            service sshd restart                
+
+  DBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DB SG
+      VpcId: !Ref VPC1
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: icmp
+        FromPort: '-1'
+        ToPort: '-1'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        CidrIp: 0.0.0.0/0        
+
   CGWSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable HTTP access via port 80 and SSH access via port 22
+      GroupDescription: Public Subnet SG
       VpcId: !Ref VPC1
       SecurityGroupIngress:
       - IpProtocol: tcp
@@ -190,181 +320,57 @@ Resources:
       - IpProtocol: tcp
         FromPort: '53'
         ToPort: '53'
-        CidrIp: 0.0.0.0/0
-
-  DNS:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      ImageId: ami-06087749a704b8168
-      KeyName: !Ref KeyName
-      NetworkInterfaces:
-        - NetworkInterfaceId: !Ref DNSENIEth0
-          DeviceIndex: 0           
-      Tags:
-        - Key: Name
-          Value: Seoul-IDC-DNSSRV
-      UserData:
-        Fn::Base64: |
-          #!/bin/bash
-          hostnamectl --static set-hostname DNSSRV
-          amazon-linux-extras install epel -y
-          yum -y install bind bind-utils bind-libs
-          sed -i "s/listen-on port 53 { 127.0.0.1; }/listen-on port 53 { any; }/g" /etc/named.conf
-          sed -i "s/allow-query     { localhost; }/allow-query     { any; }/g" /etc/named.conf
-          sed -i "s/dnssec-enable yes/dnssec-enable no/g" /etc/named.conf		  
-          sed -i "s/dnssec-validation yes/dnssec-validation no/g" /etc/named.conf
-          cat <<EOF>> /etc/named.rfc1912.zones	
-          zone "bbidc.internal" {
-              type master;
-              file "/var/named/db.bbidc.internal";
-              allow-update { none; };
-          };		  
-
-          EOF
-          cat <<EOF> /var/named/db.bbidc.internal
-          \$TTL 300
-          @ IN SOA bbidc.internal. root.bbidc.internal. (
-            2019122114 ; serial
-            3600       ; refresh
-            900        ; retry
-            604800     ; expire
-            86400      ; minimum
-          )
-          @         IN NS ns1.bbidc.internal.
-          ns1      IN A  20.0.0.200
-          dbsrv   IN A  20.0.1.100
-          dnssrv   IN A  20.0.0.200
-          
-          EOF
-          systemctl enable --now named                          
-
-
-
-  PrivateSN:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC1
-      AvailabilityZone: ap-northeast-2c #!Select [1, !GetAZs '' ]
-      CidrBlock: 20.0.1.0/24
-      Tags:
-        - Key: Name
-          Value: IDC-Private-SN
-
-  PrivateRT:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC1
-      Tags:
-        - Key: Name
-          Value: IDC-Private-RT
-
-  PrivateRoute:        
-    Type: AWS::EC2::Route
-    DependsOn: IDCEC2
-    Properties:
-      RouteTableId: !Ref PrivateRT
-      DestinationCidrBlock: 20.0.0.0/16
-      NetworkInterfaceId: !Ref ENIEth0
-
-  PrivateSNRouteTableAssociation:         
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: 
-      RouteTableId: !Ref PrivateRT
-      SubnetId: !Ref PrivateSN
-
-  IDCEC2:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      ImageId: ami-06087749a704b8168  #ami-0d6e6a06d11d7777d
-      KeyName: !Ref KeyName
-      NetworkInterfaces:
-        - DeviceIndex: 0
-          SubnetId: !Ref PrivateSN
-          GroupSet:
-          - !Ref IdcSG
-          AssociatePublicIpAddress: False
-          PrivateIpAddress: 20.0.1.100          
-      Tags:
-        - Key: Name
-          Value: IDC-Private-EC2
-      UserData:
-        Fn::Base64:
-          !Sub |
-            #!/bin/bash
-            (
-            echo "qwe123"
-            echo "qwe123"
-            ) | passwd --stdin root
-            sed -i "s/^PasswordAuthentication no/PasswordAuthentication yes/g" /etc/ssh/sshd_config
-            sed -i "s/^#PermitRootLogin yes/PermitRootLogin yes/g" /etc/ssh/sshd_config
-            service sshd restart                
-
-  IdcSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable HTTP access via port 80 and SSH access via port 22
-      VpcId: !Ref VPC1
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: '22'
-        ToPort: '22'
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: icmp
-        FromPort: '-1'
-        ToPort: '-1'
-        CidrIp: 0.0.0.0/0                               
+        CidrIp: 0.0.0.0/0                                       
 ###############################################################################
 
-## VGW 생성
-#   VPCVPNGW:
-#     Type: AWS::EC2::VPNGateway
-#     Properties:
-#       Type: ipsec.1
-#       Tags:
-#         - Key: Name
-#           Value: AWS-VPNGW
+# VGW 생성
+  VPCVPNGW:
+    Type: AWS::EC2::VPNGateway
+    Properties:
+      Type: ipsec.1
+      Tags:
+        - Key: Name
+          Value: AWS-VPNGW
 
-# # vgw vpc에 부착
-#   VPCAttachVPNGW:
-#     Type: AWS::EC2::VPCGatewayAttachment
-#     Properties:
-#       VpcId: !Ref VPCId
-#       VpnGatewayId: !Ref VPCVPNGW
+# vgw vpc에 부착
+  VPCAttachVPNGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPCId
+      VpnGatewayId: !Ref VPCVPNGW
 
-# # CGW
-#   VPCCGW:
-#     Type: AWS::EC2::CustomerGateway
-#     Properties:
-#       Type: ipsec.1
-#       BgpAsn: 65000
-#       IpAddress: !Ref VPCEIP # CGW EIP
-#       Tags:
-#         - Key: Name
-#           Value: IDC-VPN-CGW 
+# CGW
+  VPCCGW:
+    Type: AWS::EC2::CustomerGateway
+    Properties:
+      Type: ipsec.1
+      BgpAsn: 65000
+      IpAddress: !Ref CGWEIP # CGW EIP
+      Tags:
+        - Key: Name
+          Value: IDC-VPN-CGW 
 
-# # VPN 연결
-#   VPCAWSVpnConnection:
-#     Type: AWS::EC2::VPNConnection
-#     Properties:
-#       Type: ipsec.1
-#       CustomerGatewayId: !Ref VPCCGW
-#       VpnGatewayId: !Ref VPCVPNGW        # transitgateway 연결할 때 trnasit gateway id 속성 
-#       VpnTunnelOptionsSpecifications:
-#         - PreSharedKey: cloudneta  # 터널1
-#         - PreSharedKey: cloudneta  # 터널2
-#       StaticRoutesOnly: True
-#       Tags:
-#         - Key: Name
-#           Value: AWS-VPNConnection-IDC
+# VPN 연결
+  VPCAWSVpnConnection:
+    Type: AWS::EC2::VPNConnection
+    Properties:
+      Type: ipsec.1
+      CustomerGatewayId: !Ref VPCCGW
+      VpnGatewayId: !Ref VPCVPNGW        # transitgateway 연결할 때 trnasit gateway id 속성 
+      VpnTunnelOptionsSpecifications:
+        - PreSharedKey: cloudneta  # 터널1
+        - PreSharedKey: cloudneta  # 터널2
+      StaticRoutesOnly: True
+      Tags:
+        - Key: Name
+          Value: AWS-VPNConnection-IDC
 
-# # 라우팅 테이블 전파
-#   VPCAWSVpnConnectionRoute:
-#     Type: AWS::EC2::VPNConnectionRoute
-#     Properties:
-#       DestinationCidrBlock: 10.60.0.0/16
-#       VpnConnectionId: !Ref VPCAWSVpnConnection
+# 라우팅 테이블 전파
+  VPCAWSVpnConnectionRoute:
+    Type: AWS::EC2::VPNConnectionRoute
+    Properties:
+      DestinationCidrBlock: 20.0.0.0/16
+      VpnConnectionId: !Ref VPCAWSVpnConnection
 
 #   VPNAWSGatewayRoutePropagation:
 #     Type: AWS::EC2::VPNGatewayRoutePropagation

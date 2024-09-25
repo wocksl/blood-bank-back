@@ -71,7 +71,7 @@ const UserRegisterHandler = (app, db) => {
                       }
                     });
                   } else {
-                    //res.send({ message: "User Registration Successfull!" });
+                    res.send({ message: "User Registration Successfull!" });
                     console.log("**USER REGISTRATION SUCCESSFULL**");
                   }
                 });
