@@ -582,3 +582,152 @@ Resources:
           - SgManagement
           - GroupId
       ToPort: 443
+
+  ### VPC 엔드포인트 생성
+  ECRApiVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: # 사용할 VPC ID
+        Ref: VPC
+      ServiceName: com.amazonaws.ap-northeast-2.ecr.api
+      SubnetIds:
+        - !Ref SubnetPrivateEgress1A  # 사용할 서브넷의 ID
+        - !Ref SubnetPrivateEgress1C
+      SecurityGroupIds:
+        - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
+      PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
+
+  ECRDkrVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: # 사용할 VPC ID
+        Ref: VPC
+      ServiceName: com.amazonaws.ap-northeast-2.ecr.dkr
+      SubnetIds:
+        - !Ref SubnetPrivateEgress1A  # 사용할 서브넷의 ID
+        - !Ref SubnetPrivateEgress1C
+      SecurityGroupIds:
+        - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
+      PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
+
+  LogsVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: # 사용할 VPC ID
+        Ref: VPC
+      ServiceName: com.amazonaws.ap-northeast-2.logs
+      SubnetIds:
+        - !Ref SubnetPrivateEgress1A  # 사용할 서브넷의 ID
+        - !Ref SubnetPrivateEgress1C
+      SecurityGroupIds:
+        - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
+      PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
+
+  SecretsManagerVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: # 사용할 VPC ID
+        Ref: VPC
+      ServiceName: com.amazonaws.ap-northeast-2.secretsmanager
+      SubnetIds:
+        - !Ref SubnetPrivateEgress1A  # 사용할 서브넷의 ID
+        - !Ref SubnetPrivateEgress1C
+      SecurityGroupIds:
+        - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
+      PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
+
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      VpcId:
+        Ref: VPC
+      ServiceName: com.amazonaws.ap-northeast-2.s3
+      RouteTableIds:
+        - !Ref RouteApp
+
+  ### ALB, TG 생성
+  # TG 생성
+  BackendALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: backend-tg
+      Port: 3001
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "3001"
+      HealthCheckPath: "/"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200-499
+
+  frontendALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: frontend-tg
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "3000"
+      HealthCheckPath: "/"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200-499
+  
+  # ALB 생성
+  BackendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: IGW
+    Properties:
+      Name: backend-alb
+      Scheme: internal
+      SecurityGroups:
+        - !Ref SgInternal
+      Subnets:
+        - !Ref SubnetPrivateContainer1A
+        - !Ref SubnetPrivateContainer1C
+
+  FrontendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: IGW
+    Properties:
+      Name: frontend-alb
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref SgIngress
+      Subnets:
+        - !Ref SubnetPublicIngress1A
+        - !Ref SubnetPublicIngress1C
+  
+  ### ECR Repo 생성
+  BackendECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: backend  # ECR 레포지토리 이름
+      ImageTagMutability: MUTABLE  # 태그 변경 가능성 설정
+      EncryptionConfiguration:
+        EncryptionType: KMS  # AWS KMS 암호화 사용
+        KmsKey: alias/aws/ecr  # AWS 관리형 KMS 키 (관리형 KMS 키 사용 시 기본값)
+
+  FrontendECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: frontend  # ECR 레포지토리 이름
+      ImageTagMutability: MUTABLE  # 태그 변경 가능성 설정
+      EncryptionConfiguration:
+        EncryptionType: KMS  # AWS KMS 암호화 사용
+        KmsKey: alias/aws/ecr  # AWS 관리형 KMS 키 (관리형 KMS 키 사용 시 기본값)

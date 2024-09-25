@@ -6,6 +6,7 @@ GRANT ALTER, CREATE, DELETE, DROP, INDEX, INSERT, SELECT, UPDATE,
       EXECUTE, EVENT, TRIGGER, LOCK TABLES 
 ON *.* TO 'bbms'@'%';
 
+ALTER USER 'bbms'@'%' IDENTIFIED WITH mysql_native_password BY 'bbms@123';
 
 -- Creating the user_details table
 CREATE TABLE `user_details` (

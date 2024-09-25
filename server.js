@@ -69,7 +69,21 @@ const getSecret = async (secretName) => {
       password: secret.password,
       database: secret.dbname,
     });
-
+    // // IDC MySQL 연결 설정
+    // var idcDb = mysql.createConnection({
+    //   host: '10.1.1.100',  // IDC MySQL 서버 IP
+    //   user: secret.username,  // 동일한 사용자명 사용 또는 변경
+    //   password: secret.password,  // 동일한 비밀번호 사용 또는 변경
+    //   database: secret.dbname,  // 동일한 데이터베이스 사용 또는 변경
+    // });
+    // idcDb.connect((err) => {
+    //   if (err) throw err;
+    //   console.log("Connected to the IDC database!");
+    
+    //   // IDC MySQL 연결을 사용하여 UserRegisterHandler 호출
+    //   // 기존 UserRegisterHandler 삭제
+    //   UserRegisterHandler(app, idcDb);
+    // });
     db.connect((err) => {
       if (err) throw err;
       console.log("Connected to the database!");
