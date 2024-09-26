@@ -22,7 +22,7 @@ Resources:
   VPC1DNSOptions:
     Type: AWS::EC2::DHCPOptions
     Properties:
-      DomainName: idcseoul.internal    
+      DomainName: bbidc.internal    
       DomainNameServers:
         - 20.0.0.200, 8.8.8.8      
       NtpServers:                        
@@ -223,23 +223,23 @@ Resources:
           sed -i "s/dnssec-enable yes/dnssec-enable no/g" /etc/named.conf		  
           sed -i "s/dnssec-validation yes/dnssec-validation no/g" /etc/named.conf
           cat <<EOF>> /etc/named.rfc1912.zones	
-          zone "idcseoul.internal" {
+          zone "bbidc.internal" {
               type master;
-              file "/var/named/db.idcseoul.internal";
+              file "/var/named/db.bbidc.internal";
               allow-update { none; };
           };		  
 
           EOF
-          cat <<EOF> /var/named/db.idcseoul.internal
+          cat <<EOF> /var/named/db.bbidc.internal
           \$TTL 300
-          @ IN SOA idcseoul.internal. root.idcseoul.internal. (
+          @ IN SOA bbidc.internal. root.bbidc.internal. (
             2019122114 ; serial
             3600       ; refresh
             900        ; retry
             604800     ; expire
             86400      ; minimum
           )
-          @         IN NS ns1.idcseoul.internal.
+          @         IN NS ns1.bbidc.internal.
           ns1      IN A  20.0.0.200
           dbsrv   IN A  20.0.1.100
           dnssrv   IN A  20.0.0.200

@@ -4,15 +4,14 @@ import mysql from 'mysql'
 import express from 'express'
 import bodyParser from 'body-parser';
 import cors from 'cors'
-import AWS from 'aws-sdk'
+import AWS from 'aws-sdk' // aws secret manager 사용을 위한 설정
+import promClient from 'prom-client'; // prometheus 사용을 위한 설정
 
 //controllers
 //user function handlers
 import UserLoginHandler from "./controllers/user/userLoginHandler.js";
 import UserRegisterHandler from './controllers/user/UserRegisterHandler.js';
 import RequestClassHandler from './controllers/bloodbank/RequestClassHandler.js';
-
-
 
 //employee function handlers
 import EmployeeLoginHandler from './controllers/employee/EmployeeLoginHandler.js';
@@ -25,6 +24,10 @@ import HandleRequestHandler from './controllers/bloodbank/HandleRequestHandler.j
 import DashboardHandler from './controllers/dashboard/DashboardHandler.js';
 import SearchHandler from './controllers/bloodbank/SearchHandler.js';
 
+// Prometheus 메트릭 기본 설정
+const collectDefaultMetrics = promClient.collectDefaultMetrics;
+collectDefaultMetrics();  // 기본 메트릭 수집 시작
+
 //create the app
 var app = express();
 
@@ -32,6 +35,17 @@ var app = express();
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
+
+// /metrics 엔드포인트 추가 - Prometheus가 메트릭을 수집할 수 있도록 노출
+app.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await promClient.register.metrics();
+    res.set('Content-Type', promClient.register.contentType);
+    res.end(metrics);
+  } catch (ex) {
+    res.status(500).end(ex);
+  }
+});
 
 // connect to RDS with Secret Manager
 const secretsManager = new AWS.SecretsManager({

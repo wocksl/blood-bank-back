@@ -1,0 +1,31 @@
+{
+    "agent": {
+      "metrics_collection_interval": 60,
+      "logfile": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log"
+    },
+    "metrics": {
+      "append_dimensions": {
+        "ECSClusterName": "backend-cluster",
+        "TaskARN": "${AWS_ECS_TASK_ARN}"
+      },
+      "metrics_collected": {
+        "cpu": {
+          "measurement": [
+            "cpu_usage_active",
+            "cpu_usage_user",
+            "cpu_usage_system"
+          ],
+          "totalcpu": true,
+          "resources": ["*"]
+        },
+        "mem": {
+          "measurement": [
+            "mem_used_percent",
+            "mem_available_percent"
+          ],
+          "resources": ["*"]
+        }
+      }
+    }
+  }
+  
