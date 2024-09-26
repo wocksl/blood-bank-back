@@ -1,5 +1,0 @@
-scrape_configs:
-  - job_name: 'backend-fargate'
-    scrape_interval: 15s
-    static_configs:
-      - targets: ['internal-backend-alb-1163600254.ap-northeast-2.elb.amazonaws.com:3001']
