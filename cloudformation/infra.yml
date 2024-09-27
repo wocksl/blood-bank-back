@@ -752,3 +752,139 @@ Resources:
       EncryptionConfiguration:
         EncryptionType: KMS  # AWS KMS 암호화 사용
         KmsKey: alias/aws/ecr  # AWS 관리형 KMS 키 (관리형 KMS 키 사용 시 기본값)
+
+##### 09/28 추가 내용 #####
+  # 1. monitoring EP
+  MonitoringVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: # 사용할 VPC ID
+        Ref: VPC
+      ServiceName: com.amazonaws.ap-northeast-2.monitoring
+      SubnetIds:
+        - !Ref SubnetPrivateEgress1A  # 사용할 서브넷의 ID
+        - !Ref SubnetPrivateEgress1C
+      SecurityGroupIds:
+        - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
+      PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
+
+  # 2. monitoring 용 subnet (라우팅 테이블 연결 x 기본 라우팅 테이블 사용)
+  SubnetPrivateMonitoring1A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.230.0/24
+      VpcId:
+        Ref: VPC
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: subnet-private-monitoring-1a
+        - Key: Type
+          Value: Isolated
+  SubnetPrivateMonitoring1C:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.231.0/24
+      VpcId:
+        Ref: VPC
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: subnet-private-monitoring-1c
+        - Key: Type
+          Value: Isolated
+          
+  # Monitoring ec2용 보안그룹
+  SgMonitoring:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Monitoring
+      GroupName: Monitoring
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: cloudwatch-exporter port
+          FromPort: 9106
+          IpProtocol: tcp
+          ToPort: 9106
+        - CidrIp: 0.0.0.0/0
+          Description: grafana port
+          FromPort: 3030
+          IpProtocol: tcp
+          ToPort: 3030
+        - CidrIp: 0.0.0.0/0
+          Description: prometheus port
+          FromPort: 9090
+          IpProtocol: tcp
+          ToPort: 9090
+        - CidrIp: 0.0.0.0/0
+          Description: https port
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        - CidrIp: 0.0.0.0/0
+          Description: http port
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          Description: ssh port
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value: sg-monitoring
+      VpcId:
+        Ref: VPC
+  
+  # egress 보안그룹에 경로 추가 (for monitoring EP)
+  SgVpceFromSgMonitoringTCP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      Description: HTTPS for Monitoring server
+      FromPort: 443
+      GroupId:
+        Fn::GetAtt:
+          - SgEgress
+          - GroupId
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+          - SgMonitoring
+          - GroupId
+      ToPort: 443
+  
+  # bastion ec2용 보안그룹
+  SgBastion:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Bastion
+      GroupName: Bastion
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: ssh port
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value: sg-bastion
+      VpcId:
+        Ref: VPC
