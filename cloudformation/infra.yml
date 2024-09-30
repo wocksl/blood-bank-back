@@ -766,7 +766,7 @@ Resources:
         - !Ref SubnetPrivateMonitoring1A  # 사용할 서브넷의 ID
         - !Ref SubnetPrivateMonitoring1C
       SecurityGroupIds:
-        - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
+        - !Ref SgMonitoring  # VPC 엔드포인트에 사용할 보안 그룹
       PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
 
   # 2. monitoring 용 subnet (라우팅 테이블 연결 x 기본 라우팅 테이블 사용)
