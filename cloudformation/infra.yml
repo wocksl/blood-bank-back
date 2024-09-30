@@ -763,8 +763,8 @@ Resources:
         Ref: VPC
       ServiceName: com.amazonaws.ap-northeast-2.monitoring
       SubnetIds:
-        - !Ref SubnetPrivateEgress1A  # 사용할 서브넷의 ID
-        - !Ref SubnetPrivateEgress1C
+        - !Ref SubnetPrivateMonitoring1A  # 사용할 서브넷의 ID
+        - !Ref SubnetPrivateMonitoring1C
       SecurityGroupIds:
         - !Ref SgEgress  # VPC 엔드포인트에 사용할 보안 그룹
       PrivateDnsEnabled: true  # 비공개 DNS 사용 여부 (기본값: true)
