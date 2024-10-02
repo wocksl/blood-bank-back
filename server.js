@@ -91,7 +91,7 @@ const getSecret = async (secretName) => {
       // 이후 라우팅 및 핸들러 등록
       // user functionalities
       // UserRegisterHandler(app, db);
-      UserLoginHandler(app, db);
+      // UserLoginHandler(app, db);
       RequestClassHandler(app, db);
 
       // employee functionalities
