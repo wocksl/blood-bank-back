@@ -6,22 +6,22 @@ import AWS from 'aws-sdk'
 
 //controllers
 //user function handlers
-import UserLoginHandler from "./controllers_before_cognito/user/userLoginHandler.js";
-import UserRegisterHandler from './controllers_before_cognito/user/UserRegisterHandler.js';
-import RequestClassHandler from './controllers_before_cognito/bloodbank/RequestClassHandler.js';
+import UserLoginHandler from "./controllers/user/userLoginHandler.js";
+import UserRegisterHandler from './controllers/user/UserRegisterHandler.js';
+import RequestClassHandler from './controllers/bloodbank/RequestClassHandler.js';
 
 
 
 //employee function handlers
 // import EmployeeLoginHandler from './controllers/employee/EmployeeLoginHandler.js';
 // import EmployeeRegisterHandler from './controllers/employee/EmployeeRegisterHandler.js';
-import UpdateBlood from './controllers_before_cognito/bloodbank/UpdateStockHandler.js'
-import UpdateHealthHandler from './controllers_before_cognito/bloodbank/UpdateHealthHandler.js';
-import HandleRequestHandler from './controllers_before_cognito/bloodbank/HandleRequestHandler.js';
+import UpdateBlood from './controllers/bloodbank/UpdateStockHandler.js'
+import UpdateHealthHandler from './controllers/bloodbank/UpdateHealthHandler.js';
+import HandleRequestHandler from './controllers/bloodbank/HandleRequestHandler.js';
 
 //dashboard
-import DashboardHandler from './controllers_before_cognito/dashboard/DashboardHandler.js';
-import SearchHandler from './controllers_before_cognito/bloodbank/SearchHandler.js';
+import DashboardHandler from './controllers/dashboard/DashboardHandler.js';
+import SearchHandler from './controllers/bloodbank/SearchHandler.js';
 
 //create the app
 var app = express();
