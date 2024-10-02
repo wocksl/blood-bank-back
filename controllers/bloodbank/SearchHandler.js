@@ -186,7 +186,7 @@ const lambda = new AWS.Lambda({
 
 const invokeLambda = async () => {
     const params = {
-        FunctionName: 'GetUserdata-test',  // Lambda 함수 이름
+        FunctionName: 'GetUserdata',  // Lambda 함수 이름
         InvocationType: 'RequestResponse',
     };
 
