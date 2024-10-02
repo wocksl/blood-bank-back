@@ -6,7 +6,7 @@ import AWS from 'aws-sdk'
 
 //controllers
 //user function handlers
-import UserLoginHandler from "./controllers/user/userLoginHandler.js";
+// import UserLoginHandler from "./controllers/user/userLoginHandler.js";
 import UserRegisterHandler from './controllers/user/UserRegisterHandler.js';
 import RequestClassHandler from './controllers/bloodbank/RequestClassHandler.js';
 
