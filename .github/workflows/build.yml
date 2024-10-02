@@ -118,7 +118,7 @@ jobs:
     # appspec.yaml 파일에서 TaskDefinition에 최신 Task Definition ARN 반영
     - name: Update appspec.yaml with the latest Task Definition ARN
       run: |
-        sed -i "s|\"TaskDefinition\": \"\"|\"TaskDefinition\": \"$TASK_DEFINITION_ARN\"|" appspec.yaml
+        sed -i "s|\"TaskDefinition\": \"\"|\"TaskDefinition\": \"$TASK_DEFINITION_ARN\"|" ./appspec.yaml
 
     # Amazon ECS 작업 정의에 새로운 이미지 ID 반영
     - name: Fill in the new image ID in the Amazon ECS task definition
