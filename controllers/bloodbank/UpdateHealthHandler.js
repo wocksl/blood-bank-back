@@ -1,5 +1,5 @@
 //moduleexport
-const UpdateHealthHandler = (app, db) => {
+const UpdateHealthHandler = (app, idcDb) => {
   app.post("/login/emp/uh", (req, res) => {
     //variables
     const user_id = req.body.userId;
@@ -8,7 +8,7 @@ const UpdateHealthHandler = (app, db) => {
     const sqlSelect = "SELECT * FROM user_details WHERE user_id=?";
 
     //
-    db.query(sqlSelect, [user_id], (err, result) => {
+    idcDb.query(sqlSelect, [user_id], (err, result) => {
       if (err) {
         console.log("**ERROR FETCHING USER DETAILS**");
       } else {
@@ -31,7 +31,7 @@ const UpdateHealthHandler = (app, db) => {
       "UPDATE user_health SET userVitals=?, userHeight=?, userWeight=?,userStatus=? WHERE user_id=?";
 
     ////
-    db.query(
+    idcDb.query(
       sqlUpdate,
       [userVitals, userHeight, userWeight, userStatus, user_id],
       (err, result) => {

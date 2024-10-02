@@ -1,27 +1,27 @@
-
-
 import mysql from 'mysql'
 import express from 'express'
 import bodyParser from 'body-parser';
 import cors from 'cors'
-import AWS from 'aws-sdk' // aws secret manager 사용을 위한 설정
+import AWS from 'aws-sdk'
 
 //controllers
 //user function handlers
-import UserLoginHandler from "./controllers/user/userLoginHandler.js";
-import UserRegisterHandler from './controllers/user/UserRegisterHandler.js';
-import RequestClassHandler from './controllers/bloodbank/RequestClassHandler.js';
+import UserLoginHandler from "./controllers_before_cognito/user/userLoginHandler.js";
+import UserRegisterHandler from './controllers_before_cognito/user/UserRegisterHandler.js';
+import RequestClassHandler from './controllers_before_cognito/bloodbank/RequestClassHandler.js';
+
+
 
 //employee function handlers
-import EmployeeLoginHandler from './controllers/employee/EmployeeLoginHandler.js';
-import EmployeeRegisterHandler from './controllers/employee/EmployeeRegisterHandler.js';
-import UpdateBlood from './controllers/bloodbank/UpdateStockHandler.js'
-import UpdateHealthHandler from './controllers/bloodbank/UpdateHealthHandler.js';
-import HandleRequestHandler from './controllers/bloodbank/HandleRequestHandler.js';
+// import EmployeeLoginHandler from './controllers/employee/EmployeeLoginHandler.js';
+// import EmployeeRegisterHandler from './controllers/employee/EmployeeRegisterHandler.js';
+import UpdateBlood from './controllers_before_cognito/bloodbank/UpdateStockHandler.js'
+import UpdateHealthHandler from './controllers_before_cognito/bloodbank/UpdateHealthHandler.js';
+import HandleRequestHandler from './controllers_before_cognito/bloodbank/HandleRequestHandler.js';
 
 //dashboard
-import DashboardHandler from './controllers/dashboard/DashboardHandler.js';
-import SearchHandler from './controllers/bloodbank/SearchHandler.js';
+import DashboardHandler from './controllers_before_cognito/dashboard/DashboardHandler.js';
+import SearchHandler from './controllers_before_cognito/bloodbank/SearchHandler.js';
 
 //create the app
 var app = express();
@@ -54,47 +54,49 @@ const getSecret = async (secretName) => {
 };
 
 // 서버 시작 시 Secrets Manager에서 DB 연결 정보 가져오기
+// 서버 시작 시 Secrets Manager에서 DB 연결 정보 가져오기
 (async () => {
   try {
     // AWS Secrets Manager에서 설정한 비밀 이름
-    const secretName = "bbms/mysql";  // AWS Secrets Manager에 저장한 비밀 이름
+    const secretName = "bbms/mysql1";  // AWS Secrets Manager에 저장한 비밀 이름
     const secret = await getSecret(secretName);
 
-    // MySQL 연결 설정
+    // AWS RDS MySQL 연결 설정
     var db = mysql.createConnection({
       host: secret.host,
       user: secret.username,
       password: secret.password,
       database: secret.dbname,
     });
-    // // IDC MySQL 연결 설정
-    // var idcDb = mysql.createConnection({
-    //   host: '10.1.1.100',  // IDC MySQL 서버 IP
-    //   user: secret.username,  // 동일한 사용자명 사용 또는 변경
-    //   password: secret.password,  // 동일한 비밀번호 사용 또는 변경
-    //   database: secret.dbname,  // 동일한 데이터베이스 사용 또는 변경
-    // });
-    // idcDb.connect((err) => {
-    //   if (err) throw err;
-    //   console.log("Connected to the IDC database!");
     
-    //   // IDC MySQL 연결을 사용하여 UserRegisterHandler 호출
-    //   // 기존 UserRegisterHandler 삭제
-    //   UserRegisterHandler(app, idcDb);
-    // });
+    // IDC MySQL 연결 설정
+    var idcDb = mysql.createConnection({
+      host: '10.1.1.100',  // IDC MySQL 서버 DNS
+      user: secret.username,  // 동일한 사용자명 사용 또는 변경
+      password: secret.password,  // 동일한 비밀번호 사용 또는 변경
+      database: secret.dbname,  // 동일한 데이터베이스 사용 또는 변경
+    });
+    idcDb.connect((err) => {
+      if (err) throw err;
+      console.log("Connected to the IDC database!");
+    
+      // IDC MySQL 연결을 사용하여 UserRegisterHandler 호출
+      UserRegisterHandler(app, idcDb);
+    });
+    
     db.connect((err) => {
       if (err) throw err;
-      console.log("Connected to the database!");
+      console.log("Connected to the RDS database!");
 
       // 이후 라우팅 및 핸들러 등록
       // user functionalities
-      UserRegisterHandler(app, db);
+      // UserRegisterHandler(app, db);
       UserLoginHandler(app, db);
       RequestClassHandler(app, db);
 
       // employee functionalities
-      EmployeeRegisterHandler(app, db);
-      EmployeeLoginHandler(app, db);
+      // EmployeeRegisterHandler(app, db);
+      // EmployeeLoginHandler(app, db);
       UpdateHealthHandler(app, db);
       HandleRequestHandler(app, db);
 
@@ -102,6 +104,11 @@ const getSecret = async (secretName) => {
       DashboardHandler(app, db);
       UpdateBlood(app, db);
       SearchHandler(app, db);
+
+      // Health check endpoint
+      app.get('/health', (req, res) => {
+        res.status(200).send('Healthy');
+      });      
 
       // 서버 리스닝
       app.listen(3001, (err) => {

@@ -1,4 +1,3 @@
-
 const DashboardHandler = (app, db) => {
   app.get("/home", (req, res) => {
     //query

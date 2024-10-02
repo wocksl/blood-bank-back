@@ -1,10 +1,10 @@
 //module export
-const UpdateStockHandler = (app, db) => {
+const UpdateStockHandler = (app, idcDb) => {
   app.get("/login/emp/ub", (req, res) => {
     //query
     const sqlSelect = "SELECT * FROM blood_stocks;";
 
-    db.query(sqlSelect, (err, result) => {
+    idcDb.query(sqlSelect, (err, result) => {
       if (err) {
         console.log(err);
       } else {
@@ -20,7 +20,7 @@ const UpdateStockHandler = (app, db) => {
     //query
     const sqlUpdate = "UPDATE blood_stocks SET unit=? WHERE b_id= ?;";
     //
-    db.query(sqlUpdate, [unitUpdate, b_id], (err, result) => {
+    idcDb.query(sqlUpdate, [unitUpdate, b_id], (err, result) => {
       // res.send(result);
       if (err) {
         console.log("**ERROR IN UPDATING UNIT VALUE**" + err);

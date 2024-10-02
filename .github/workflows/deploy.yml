@@ -1,0 +1,50 @@
+name: Deploy to Amazon ECS
+
+on:
+  workflow_run:
+    workflows: ["Build Docker Image"]
+    types:
+      - completed
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECS_CLUSTER: backend-cluster
+  ECS_SERVICE: backend-cluster-service
+  CONTAINER_NAME: backend
+
+jobs:
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Retrieve most recent ECS task definition
+      id: retrieve-task-def
+      run: |
+        TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition backend-def --query 'taskDefinition.taskDefinitionArn' --output text)
+        echo "TASK_DEFINITION_ARN=$TASK_DEFINITION_ARN" >> $GITHUB_ENV
+        aws ecs describe-task-definition --task-definition backend-def --query taskDefinition > task-definition.json
+
+    - name: Fill in the new image ID in the ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ env.IMAGE_URI }}
+
+    - name: Deploy ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true

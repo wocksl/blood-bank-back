@@ -1,5 +1,5 @@
 ///module export
-const RequestClassHandler = (app, db) => {
+const RequestClassHandler = (app, idcDb) => {
   app.post("/request", (req, res) => {
     const blood_group = req.body.blood_group;
     const unit = req.body.unit;
@@ -10,7 +10,7 @@ const RequestClassHandler = (app, db) => {
     const sqlInsert =
       "INSERT INTO  user_request(blood_group,unit) VALUES (?,?)";
     //
-    db.query(sqlSelect, [blood_group], (err, result) => {
+    idcDb.query(sqlSelect, [blood_group], (err, result) => {
       if (err) {
         console.log("**ERROR**" + err);
       } else {
@@ -18,7 +18,7 @@ const RequestClassHandler = (app, db) => {
         console.log(result[0].unit);
         if (unit <= result[0].unit) {
           //
-          db.query(sqlInsert, [blood_group, unit], (err, result) => {
+          idcDb.query(sqlInsert, [blood_group, unit], (err, result) => {
             if (err) {
               console.log("**ERROR ACCEPTING REQUEST!" + err);
             } else {
