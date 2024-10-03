@@ -66,9 +66,9 @@ jobs:
 
     - name: Send Dockle result to Slack via Webhook
       run: |
-        result=$(cat dockle_result.txt)
+        result=$(cat dockle_result.txt | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
         payload="{
-          \"text\": \"Dockle scan result for $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG:\n\`\`\`$result\`\`\`\"
+          \"text\": \"Dockle scan result for $ECR_REPOSITORY:$IMAGE_TAG:\n\`\`\`$result\`\`\`\"
         }"
         curl -X POST -H 'Content-type: application/json' --data "$payload" ${{ secrets.SLACK_WEB_HOOK_URL }}
 
