@@ -5,20 +5,15 @@ on:
     branches: [ "main" ]
 
 env:
-  # AWS Region 설정
   AWS_REGION: ap-northeast-2
-  # backend ECR Repository 설정
   ECR_REPOSITORY: backend
-  # backend ECS Service 설정
   ECS_SERVICE: backend-cluster-service
-  # backend ECS Cluster 설정
   ECS_CLUSTER: backend-cluster
-  # backend Container Name 설정
   CONTAINER_NAME: backend
 
 permissions:
   contents: read
-  security-events: write  # SARIF 파일 업로드 권한
+  security-events: write
 
 jobs:
   deploy:
@@ -33,9 +28,7 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
-        # AWS 액세스 키 ID 설정 [github secrets]
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        # AWS 비밀 액세스 키 설정 [github secrets]
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
@@ -43,31 +36,27 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # 이미지 빌드 과정 
-    - name: Build image
+    - name: Build Image
       id: build-image
       env:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-    # Dockle image pull
-    - name: Build Dockle
+    - name: Pull Dockle Image
       run: |
         docker pull goodwithtech/dockle:latest
 
-    # Dockle 보안 스캔 및 결과 저장
-    - name: Run Dockle security scan
+    - name: Run Dockle Security Scan
       continue-on-error: true
       env:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
 
-    # Trivy 취약점 스캔
-    - name: Run Trivy vulnerability scanner
+    - name: Run Trivy Vulnerability Scanner
       uses: aquasecurity/trivy-action@0.20.0
-      continue-on-error: true  # 보안 검사 실패 시도 계속 진행
+      continue-on-error: true
       with:
         image-ref: '${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
         format: 'sarif'
@@ -77,14 +66,12 @@ jobs:
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
 
-    # 취약점 github에 게시
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: trivy-results.sarif
 
-    # 이미지 태그 생성 및 ECR에 image push
-    - name: Push image to Amazon ECR
+    - name: Push Image to Amazon ECR
       id: push-image
       if: success()
       env:
@@ -95,9 +82,7 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # 가장 최신의 ECS 작업 정의 JSON 파일 검색
-    # 가장 최신의 ECS 작업 정의 ARN 가져오기
-    - name: Retrieve most recent ECS task definition JSON file
+    - name: Retrieve most recent ECS task definition JSON file & ARN
       id: retrieve-task-def
       run: |
         TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition backend-def --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -106,7 +91,6 @@ jobs:
         cat task-definition.json
         echo "::set-output name=task-def-file::task-definition.json"
     
-    # appspec.yaml 파일에서 TaskDefinition에 최신 Task Definition ARN 반영
     - name: Update appspec.yaml with the latest Task Definition ARN
       run: |
         sed -i "s|\"TaskDefinition\": \"\"|\"TaskDefinition\": \"$TASK_DEFINITION_ARN\"|" appspec.yaml
@@ -136,5 +120,5 @@ jobs:
         status: ${{ job.status }}
         fields: repo,message,commit,author,eventName,workflow
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEB_HOOK_URL }} # required
-      if: always() # Pick up events even if the job fails or is canceled.
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEB_HOOK_URL }}
+      if: always()
