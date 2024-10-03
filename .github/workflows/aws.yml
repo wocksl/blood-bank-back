@@ -56,13 +56,21 @@ jobs:
       run: |
         docker pull goodwithtech/dockle:latest
 
-    # Dockle 보안 스캔
+    # Dockle 보안 스캔 및 결과 저장
     - name: Run Dockle security scan
       continue-on-error: true
       env:
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock goodwithtech/dockle $ECR_REPOSITORY:$IMAGE_TAG > dockle_result.txt
+
+    - name: Send Dockle result to Slack via Webhook
+      run: |
+        result=$(cat dockle_result.txt)
+        payload="{
+          \"text\": \"Dockle scan result for $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG:\n\`\`\`$result\`\`\`\"
+        }"
+        curl -X POST -H 'Content-type: application/json' --data "$payload" ${{ secrets.SLACK_WEB_HOOK_URL }}
 
     # Trivy 취약점 스캔
     - name: Run Trivy vulnerability scanner
@@ -83,52 +91,59 @@ jobs:
       with:
         sarif_file: trivy-results.sarif
 
-    # 이미지 태그 생성 및 ECR에 image push
-    - name: Push image to Amazon ECR
-      id: push-image
-      if: success()
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+    # - name: Count vulnerabilities
+    #     id: vulnerabilities
+    #     run: |
+    #       count=$(jq '.runs[].results[].ruleId' ./trivy-results.sarif | wc -c)
+    #       echo "result_count=$count" >> $GITHUB_OUTPUT
+    #       echo "$count"
 
-    # 가장 최신의 ECS 작업 정의 JSON 파일 검색
-    # 가장 최신의 ECS 작업 정의 ARN 가져오기
-    - name: Retrieve most recent ECS task definition JSON file
-      id: retrieve-task-def
-      run: |
-        TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition backend-def --query 'taskDefinition.taskDefinitionArn' --output text)
-        echo "TASK_DEFINITION_ARN=$TASK_DEFINITION_ARN" >> $GITHUB_ENV
-        aws ecs describe-task-definition --task-definition backend-def --query taskDefinition > task-definition.json
-        cat task-definition.json
-        echo "::set-output name=task-def-file::task-definition.json"
-    
-    # appspec.yaml 파일에서 TaskDefinition에 최신 Task Definition ARN 반영
-    - name: Update appspec.yaml with the latest Task Definition ARN
-      run: |
-        sed -i "s|\"TaskDefinition\": \"\"|\"TaskDefinition\": \"$TASK_DEFINITION_ARN\"|" appspec.yaml
-    
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ steps.retrieve-task-def.outputs.task-def-file }}
-        container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.push-image.outputs.image }}
+    # # 이미지 태그 생성 및 ECR에 image push
+    # - name: Push image to Amazon ECR
+    #   id: push-image
+    #   if: success()
+    #   env:
+    #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+    #     IMAGE_TAG: ${{ github.sha }}
+    #   run: |
+    #     docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+    #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+    #     echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
-        codedeploy-appspec: appspec.yaml
-        codedeploy-application: AppECS-backend-cluster-backend-cluster-service
-        codedeploy-deployment-group: DgpECS-backend-cluster-backend-cluster-service
+    # # 가장 최신의 ECS 작업 정의 JSON 파일 검색
+    # # 가장 최신의 ECS 작업 정의 ARN 가져오기
+    # - name: Retrieve most recent ECS task definition JSON file
+    #   id: retrieve-task-def
+    #   run: |
+    #     TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition backend-def --query 'taskDefinition.taskDefinitionArn' --output text)
+    #     echo "TASK_DEFINITION_ARN=$TASK_DEFINITION_ARN" >> $GITHUB_ENV
+    #     aws ecs describe-task-definition --task-definition backend-def --query taskDefinition > task-definition.json
+    #     cat task-definition.json
+    #     echo "::set-output name=task-def-file::task-definition.json"
+    
+    # # appspec.yaml 파일에서 TaskDefinition에 최신 Task Definition ARN 반영
+    # - name: Update appspec.yaml with the latest Task Definition ARN
+    #   run: |
+    #     sed -i "s|\"TaskDefinition\": \"\"|\"TaskDefinition\": \"$TASK_DEFINITION_ARN\"|" appspec.yaml
+    
+    # - name: Fill in the new image ID in the Amazon ECS task definition
+    #   id: task-def
+    #   uses: aws-actions/amazon-ecs-render-task-definition@v1
+    #   with:
+    #     task-definition: ${{ steps.retrieve-task-def.outputs.task-def-file }}
+    #     container-name: ${{ env.CONTAINER_NAME }}
+    #     image: ${{ steps.push-image.outputs.image }}
+
+    # - name: Deploy Amazon ECS task definition
+    #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+    #   with:
+    #     task-definition: ${{ steps.task-def.outputs.task-definition }}
+    #     service: ${{ env.ECS_SERVICE }}
+    #     cluster: ${{ env.ECS_CLUSTER }}
+    #     wait-for-service-stability: true
+    #     codedeploy-appspec: appspec.yaml
+    #     codedeploy-application: AppECS-backend-cluster-backend-cluster-service
+    #     codedeploy-deployment-group: DgpECS-backend-cluster-backend-cluster-service
 
     - name: Send Slack Message
       uses: 8398a7/action-slack@v3
